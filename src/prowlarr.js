@@ -63,13 +63,18 @@ export class ProwlarrClient {
     if (url.origin !== new URL(this.url).origin) {
       throw new Error('Prowlarr returned a download URL outside its configured origin');
     }
+    // Usenet indexers legitimately 302-redirect Prowlarr's download link to the
+    // indexer's own NZB file host (e.g. Newznab "redirect" mode, required by
+    // Prowlarr for all usenet indexers). The redirect target is fetched
+    // server-side only; its bytes never reach the browser, so following it is
+    // safe as long as the *initial* request stayed within Prowlarr's origin.
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     try {
       const response = await fetch(url, {
         headers: { 'X-Api-Key': this.apiKey, Accept: 'application/x-nzb, application/octet-stream' },
         signal: controller.signal,
-        redirect: 'error'
+        redirect: 'follow'
       });
       if (!response.ok) throw new Error(`Prowlarr NZB download failed with HTTP ${response.status}`);
       const bytes = new Uint8Array(await response.arrayBuffer());
