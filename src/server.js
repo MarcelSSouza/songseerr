@@ -9,6 +9,7 @@ import { SabnzbdClient } from './sabnzbd.js';
 import { RequestStore } from './store.js';
 import { DownloadMonitor } from './download-monitor.js';
 import { MusicImporter } from './importer.js';
+import { MusicLibrary } from './library.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.resolve(here, '../public');
@@ -33,6 +34,7 @@ const monitor = new DownloadMonitor({
   intervalMs: config.monitorIntervalMs,
   category: config.sabnzbd.category
 });
+const library = new MusicLibrary({ libraryDir: config.libraryDir });
 
 function publicRequest(item) {
   return {
@@ -113,7 +115,11 @@ async function serveStatic(urlPath, res) {
       'Content-Type': mimeType(file),
       'Cache-Control': file.endsWith('.html') ? 'no-cache' : 'public, max-age=300',
       'X-Content-Type-Options': 'nosniff',
-      'Content-Security-Policy': "default-src 'self'; img-src 'self' https://coverartarchive.org data:; connect-src 'self'; style-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'"
+      // coverartarchive.org 307s to archive.org, which then 302s to a
+      // per-request regional CDN subdomain (e.g. dn721908.ca.archive.org).
+      // Browsers re-check CSP against redirect targets, so both archive.org
+      // hosts need to be allowed or every cover image silently fails to load.
+      'Content-Security-Policy': "default-src 'self'; img-src 'self' https://coverartarchive.org https://archive.org https://*.archive.org data:; connect-src 'self'; style-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'"
     });
     res.end(content);
     return true;
@@ -182,6 +188,39 @@ async function handleApi(req, res, url) {
       await store.update(item.id, { status: 'request_failed', import: { ...item.import, error: 'download_submission_failed' } });
       throw error;
     }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/library') {
+    if (!library.configured) return sendJson(res, 200, { albums: [], singles: [] });
+    const force = url.searchParams.get('refresh') === '1';
+    return sendJson(res, 200, await library.list({ force }));
+  }
+  if (req.method === 'GET' && url.pathname === '/api/library/album') {
+    const dir = String(url.searchParams.get('path') || '');
+    if (!dir) return sendJson(res, 400, { error: 'path is required' });
+    return sendJson(res, 200, { tracks: await library.albumTracks(dir) });
+  }
+  if (req.method === 'GET' && url.pathname === '/api/library/stream') {
+    const file = String(url.searchParams.get('path') || '');
+    if (!file) return sendJson(res, 400, { error: 'path is required' });
+    const { status, size, start, end, contentType, stream } = await library.streamFile(file, req.headers.range);
+    res.writeHead(status, {
+      'Content-Type': contentType,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': end - start + 1,
+      ...(status === 206 ? { 'Content-Range': `bytes ${start}-${end}/${size}` } : {}),
+      'Cache-Control': 'private, max-age=3600',
+      'X-Content-Type-Options': 'nosniff'
+    });
+    stream.on('error', () => res.destroy());
+    return stream.pipe(res);
+  }
+  if (req.method === 'GET' && url.pathname === '/api/library/cover') {
+    const file = String(url.searchParams.get('path') || '');
+    if (!file) return sendJson(res, 400, { error: 'path is required' });
+    const { contentType, stream } = await library.coverFile(file);
+    res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': 'private, max-age=86400', 'X-Content-Type-Options': 'nosniff' });
+    stream.on('error', () => res.destroy());
+    return stream.pipe(res);
   }
   return sendJson(res, 404, { error: 'API endpoint not found' });
 }

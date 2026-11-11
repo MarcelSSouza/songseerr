@@ -10,7 +10,7 @@
 <body>
   <header class="topbar">
     <a class="brand" href="/" aria-label="SongSeerr home"><span>♪</span> SongSeerr</a>
-    <nav><button class="nav-button active" data-view="discover">Discover</button><button class="nav-button" data-view="requests">Requests</button></nav>
+    <nav><button class="nav-button active" data-view="discover">Discover</button><button class="nav-button" data-view="requests">Requests</button><button class="nav-button" data-view="library">Library</button></nav>
     <span id="service-status" class="status-pill">Checking services…</span>
   </header>
 
@@ -39,7 +39,22 @@
       <div class="section-heading"><div><p class="eyebrow">ACTIVITY</p><h1>Your requests</h1></div><button id="refresh-requests" class="secondary">Refresh</button></div>
       <div id="requests" class="request-list empty-state"><p>No requests yet.</p></div>
     </section>
+
+    <section id="library-view" class="content-section hidden">
+      <div class="section-heading"><div><p class="eyebrow">YOUR MUSIC</p><h1>Library</h1></div><button id="refresh-library" class="secondary">Refresh</button></div>
+      <div id="library-message" class="message hidden" role="status"></div>
+      <h3 class="library-subhead">Albums</h3>
+      <div id="library-albums" class="cards empty-state"><p>No albums found yet.</p></div>
+      <h3 class="library-subhead">Loose tracks</h3>
+      <div id="library-singles" class="request-list empty-state"><p>No loose tracks found.</p></div>
+    </section>
   </main>
+
+  <footer id="player-bar" class="player-bar hidden">
+    <div class="player-info"><strong id="player-title">—</strong><span id="player-subtitle"></span></div>
+    <audio id="player-audio" controls></audio>
+    <div id="player-queue" class="player-queue"></div>
+  </footer>
 
   <dialog id="release-dialog">
     <form method="dialog" class="dialog-shell">
@@ -54,6 +69,18 @@
     <article class="media-card">
       <div class="cover"><img alt="" loading="lazy"><span class="cover-fallback">♪</span><span class="type-badge"></span></div>
       <div class="card-body"><h3></h3><p class="artist"></p><p class="metadata"></p><button class="request-button">Find releases</button></div>
+    </article>
+  </template>
+  <template id="library-album-template">
+    <article class="media-card">
+      <div class="cover"><img alt="" loading="lazy"><span class="cover-fallback">♪</span></div>
+      <div class="card-body"><h3></h3><p class="artist"></p><p class="metadata"></p><button class="request-button">Play album</button></div>
+    </article>
+  </template>
+  <template id="library-single-row-template">
+    <article class="request-row">
+      <div><h3></h3><div class="release-meta"></div></div>
+      <button class="request-button">Play</button>
     </article>
   </template>
   <script type="module" src="/app.js"></script>
