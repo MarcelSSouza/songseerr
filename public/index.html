@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <title>SongSeerr</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="SongSeerr home"><span>♪</span> SongSeerr</a>
+    <nav><button class="nav-button active" data-view="discover">Discover</button><button class="nav-button" data-view="requests">Requests</button></nav>
+    <span id="service-status" class="status-pill">Checking services…</span>
+  </header>
+
+  <main>
+    <section id="discover-view">
+      <div class="hero">
+        <p class="eyebrow">YOUR MUSIC, ON REQUEST</p>
+        <h1>Find a song. Request an album.<br><span>Choose the quality.</span></h1>
+        <p>Search MusicBrainz, find releases through Prowlarr, and send them to SABnzbd.</p>
+        <form id="search-form" class="search-bar">
+          <label class="sr-only" for="search-input">Song, album, or artist</label>
+          <input id="search-input" autocomplete="off" placeholder="Search for a song, album, or artist…" required minlength="2">
+          <select id="search-type" aria-label="Search type"><option value="all">Everything</option><option value="song">Songs</option><option value="album">Albums</option></select>
+          <button type="submit">Search</button>
+        </form>
+      </div>
+
+      <section class="content-section">
+        <div class="section-heading"><div><p class="eyebrow">CATALOGUE</p><h2 id="results-title">Start with a search</h2></div><span id="result-count"></span></div>
+        <div id="message" class="message hidden" role="status"></div>
+        <div id="results" class="cards empty-state"><p>Song and album results will appear here.</p></div>
+      </section>
+    </section>
+
+    <section id="requests-view" class="content-section hidden">
+      <div class="section-heading"><div><p class="eyebrow">ACTIVITY</p><h1>Your requests</h1></div><button id="refresh-requests" class="secondary">Refresh</button></div>
+      <div id="requests" class="request-list empty-state"><p>No requests yet.</p></div>
+    </section>
+  </main>
+
+  <dialog id="release-dialog">
+    <form method="dialog" class="dialog-shell">
+      <div class="dialog-header"><div><p class="eyebrow">CHOOSE A RELEASE</p><h2 id="dialog-title">Release results</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div>
+      <div class="quality-row"><label for="quality">Quality profile</label><select id="quality"><option value="flac-preferred">FLAC preferred, MP3 fallback</option><option value="flac-only">FLAC only</option><option value="mp3-preferred">MP3 preferred, FLAC fallback</option><option value="mp3-only">MP3 only</option></select><button id="rerun-release-search" type="button" class="secondary">Apply</button></div>
+      <div id="release-message" class="message hidden"></div>
+      <div id="releases" class="release-list"></div>
+    </form>
+  </dialog>
+
+  <template id="result-template">
+    <article class="media-card">
+      <div class="cover"><img alt="" loading="lazy"><span class="cover-fallback">♪</span><span class="type-badge"></span></div>
+      <div class="card-body"><h3></h3><p class="artist"></p><p class="metadata"></p><button class="request-button">Find releases</button></div>
+    </article>
+  </template>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

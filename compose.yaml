@@ -1,0 +1,11 @@
+services:
+  songseerr:
+    build: .
+    container_name: songseerr
+    restart: unless-stopped
+    ports:
+      - "8788:8788"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
