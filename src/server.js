@@ -7,6 +7,8 @@ import { MusicBrainzClient } from './musicbrainz.js';
 import { ProwlarrClient } from './prowlarr.js';
 import { SabnzbdClient } from './sabnzbd.js';
 import { RequestStore } from './store.js';
+import { DownloadMonitor } from './download-monitor.js';
+import { MusicImporter } from './importer.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.resolve(here, '../public');
@@ -15,6 +17,55 @@ const store = new RequestStore(config.dataDir);
 const musicBrainz = new MusicBrainzClient(config.musicBrainzUserAgent);
 const prowlarr = new ProwlarrClient(config.prowlarr);
 const sabnzbd = new SabnzbdClient(config.sabnzbd);
+const importer = new MusicImporter({
+  store,
+  downloadDir: config.downloadDir,
+  sabCompleteDir: config.sabCompleteDir,
+  libraryDir: config.libraryDir,
+  dataDir: config.dataDir,
+  ffprobePath: config.ffprobePath,
+  ffmpegPath: config.ffmpegPath
+});
+const monitor = new DownloadMonitor({
+  store,
+  sabnzbd,
+  importer: importer.configured ? importer : null,
+  intervalMs: config.monitorIntervalMs,
+  category: config.sabnzbd.category
+});
+
+function publicRequest(item) {
+  return {
+    id: item.id,
+    type: item.type,
+    title: item.title,
+    artist: item.artist,
+    album: item.album,
+    metadataId: item.metadataId,
+    durationMs: item.durationMs,
+    year: item.year,
+    quality: item.quality,
+    status: item.status,
+    release: item.release ? {
+      title: item.release.title,
+      indexer: item.release.indexer,
+      detectedFormat: item.release.detectedFormat,
+      size: item.release.size
+    } : null,
+    download: {
+      status: item.download?.sabStatus || '',
+      progress: Number(item.download?.progress || 0),
+      completedAt: item.download?.completedAt || null
+    },
+    import: {
+      attempt: Number(item.import?.attempt || 0),
+      files: Array.isArray(item.import?.files) ? item.import.files : [],
+      error: item.import?.error || null
+    },
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt
+  };
+}
 
 function sendJson(res, status, body) {
   res.writeHead(status, {
@@ -74,7 +125,12 @@ async function serveStatic(urlPath, res) {
 
 async function handleApi(req, res, url) {
   if (req.method === 'GET' && url.pathname === '/api/status') {
-    return sendJson(res, 200, { name: 'SongSeerr', version: '0.1.0', services: configuredServices(config), defaultQuality: config.defaultQuality });
+    return sendJson(res, 200, {
+      name: 'SongSeerr',
+      version: '0.2.0',
+      services: { ...configuredServices(config), importer: importer.configured },
+      defaultQuality: config.defaultQuality
+    });
   }
   if (req.method === 'GET' && url.pathname === '/api/search') {
     const query = String(url.searchParams.get('q') || '').trim();
@@ -90,29 +146,53 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { releases: await prowlarr.search(query, quality) });
   }
   if (req.method === 'GET' && url.pathname === '/api/requests') {
-    return sendJson(res, 200, { requests: store.list() });
+    return sendJson(res, 200, { requests: store.list().map(publicRequest) });
+  }
+  const requestMatch = url.pathname.match(/^\/api\/requests\/([0-9a-f-]+)$/i);
+  if (req.method === 'GET' && requestMatch) {
+    const item = store.get(requestMatch[1]);
+    return item ? sendJson(res, 200, { request: publicRequest(item) }) : sendJson(res, 404, { error: 'Request not found' });
+  }
+  const retryMatch = url.pathname.match(/^\/api\/requests\/([0-9a-f-]+)\/retry-import$/i);
+  if (req.method === 'POST' && retryMatch) {
+    const item = store.get(retryMatch[1]);
+    if (!item) return sendJson(res, 404, { error: 'Request not found' });
+    const updated = await store.transition(item.id, ['import_failed', 'needs_attention'], 'import_pending', {
+      import: { ...item.import, error: null }
+    });
+    if (!updated) return sendJson(res, 409, { error: 'Request cannot be retried from its current state' });
+    return sendJson(res, 202, { request: publicRequest(updated) });
   }
   if (req.method === 'POST' && url.pathname === '/api/requests') {
     const input = await bodyJson(req);
     validateRequest(input);
-    let status = 'requested';
-    let downloadId = null;
-    if (input.release?.candidateId) {
+    const item = await store.create({ ...input, status: input.release?.candidateId ? 'submitting' : 'requested' });
+    if (!input.release?.candidateId) return sendJson(res, 201, { request: publicRequest(item) });
+    try {
       const candidate = await prowlarr.downloadNzb(input.release.candidateId);
       const result = await sabnzbd.submitNzb(candidate.bytes, `${input.artist || ''} - ${input.title}`.trim());
-      input.release = candidate.release;
-      status = 'downloading';
-      downloadId = result.downloadId;
+      const updated = await store.update(item.id, {
+        release: candidate.release,
+        status: 'downloading',
+        downloadId: result.downloadId,
+        download: { sabStatus: 'Queued', progress: 0, missingPolls: 0, lastSeenAt: new Date().toISOString(), completedAt: null }
+      });
+      return sendJson(res, 201, { request: publicRequest(updated) });
+    } catch (error) {
+      await store.update(item.id, { status: 'request_failed', import: { ...item.import, error: 'download_submission_failed' } });
+      throw error;
     }
-    const item = await store.create({ ...input, status, downloadId });
-    return sendJson(res, 201, { request: item });
   }
   return sendJson(res, 404, { error: 'API endpoint not found' });
 }
 
 export async function createServer() {
   await store.init();
-  return http.createServer(async (req, res) => {
+  for (const item of store.listByStatuses(['inspecting', 'importing'])) {
+    await store.transition(item.id, ['inspecting', 'importing'], 'import_pending');
+  }
+  if (configuredServices(config).sabnzbd) monitor.start();
+  const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     try {
       if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
@@ -121,9 +201,11 @@ export async function createServer() {
     } catch (error) {
       const status = Number(error.status || 500);
       console.error(`[${new Date().toISOString()}] ${req.method} ${url.pathname}: ${error.message}`);
-      sendJson(res, status, { error: status >= 500 ? 'Request failed' : error.message, detail: error.message });
+      sendJson(res, status, status >= 500 ? { error: 'Request failed' } : { error: error.message });
     }
   });
+  server.on('close', () => monitor.stop());
+  return server;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

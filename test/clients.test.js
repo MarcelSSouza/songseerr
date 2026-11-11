@@ -63,3 +63,23 @@ test('SABnzbd client uploads NZB bytes as multipart data', async (t) => {
   const result = await client.submitNzb(Buffer.from('<nzb></nzb>'), 'Artist - Album');
   assert.deepEqual(result, { accepted: true, downloadId: 'SABnzbd_nzo_abc' });
 });
+
+test('SABnzbd client normalizes queue and history status', async (t) => {
+  const mock = await mockServer((req, res) => {
+    const url = new URL(req.url, 'http://localhost');
+    assert.equal(url.searchParams.get('nzo_ids'), 'one,two');
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    if (url.searchParams.get('mode') === 'queue') {
+      res.end(JSON.stringify({ queue: { slots: [{ nzo_id: 'one', status: 'Downloading', percentage: '42.5', cat: 'music' }] } }));
+    } else {
+      res.end(JSON.stringify({ history: { slots: [{ nzo_id: 'two', status: 'Completed', category: 'music', storage: '/downloads/album' }] } }));
+    }
+  });
+  t.after(() => mock.server.close());
+  const client = new SabnzbdClient({ url: mock.url, apiKey: 'sab-key', category: 'music' });
+  const queue = await client.queue(['one', 'two']);
+  const history = await client.history(['one', 'two']);
+  assert.equal(queue.get('one').progress, 42.5);
+  assert.equal(history.get('two').status, 'Completed');
+  assert.equal(history.get('two').storage, '/downloads/album');
+});

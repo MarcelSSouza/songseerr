@@ -35,4 +35,63 @@ export class SabnzbdClient {
       clearTimeout(timeout);
     }
   }
+
+  async requestStatus(mode, downloadIds) {
+    this.assertConfigured();
+    const ids = [...new Set(downloadIds.filter(Boolean))];
+    const combined = new Map();
+    for (let offset = 0; offset < ids.length; offset += 50) {
+      const batch = ids.slice(offset, offset + 50);
+      const params = new URLSearchParams({
+        mode,
+        output: 'json',
+        apikey: this.apiKey,
+        nzo_ids: batch.join(',')
+      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      try {
+        const response = await fetch(`${this.url}/api?${params}`, { signal: controller.signal });
+        const body = await response.json().catch(() => null);
+        if (!response.ok || !body) throw new Error(`SABnzbd ${mode} request failed with HTTP ${response.status}`);
+        const slots = body?.[mode]?.slots;
+        if (!Array.isArray(slots)) throw new Error(`SABnzbd returned an invalid ${mode} response`);
+        for (const slot of slots) {
+          const id = slot.nzo_id || slot.nzoId;
+          if (!id) continue;
+          if (mode === 'queue') {
+            const progress = Number.parseFloat(slot.percentage);
+            combined.set(id, {
+              id,
+              status: String(slot.status || ''),
+              category: String(slot.cat || ''),
+              progress: Number.isFinite(progress) ? progress : 0,
+              filename: String(slot.filename || ''),
+              timeLeft: String(slot.timeleft || '')
+            });
+          } else {
+            combined.set(id, {
+              id,
+              status: String(slot.status || ''),
+              category: String(slot.category || slot.cat || ''),
+              storage: String(slot.storage || ''),
+              failMessage: String(slot.fail_message || ''),
+              completedAt: slot.completed || slot.completed_at || null
+            });
+          }
+        }
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+    return combined;
+  }
+
+  queue(downloadIds) {
+    return this.requestStatus('queue', downloadIds);
+  }
+
+  history(downloadIds) {
+    return this.requestStatus('history', downloadIds);
+  }
 }

@@ -19,6 +19,12 @@ export function loadConfig(env = process.env) {
       apiKey: env.SABNZBD_API_KEY || '',
       category: env.SABNZBD_CATEGORY || 'music'
     },
+    monitorIntervalMs: Math.max(5000, Number(env.MONITOR_INTERVAL_MS || 30000)),
+    sabCompleteDir: env.SABNZBD_COMPLETE_DIR || '',
+    downloadDir: env.DOWNLOAD_DIR ? path.resolve(env.DOWNLOAD_DIR) : '',
+    libraryDir: env.MUSIC_LIBRARY_DIR ? path.resolve(env.MUSIC_LIBRARY_DIR) : '',
+    ffprobePath: env.FFPROBE_PATH || 'ffprobe',
+    ffmpegPath: env.FFMPEG_PATH || 'ffmpeg',
     defaultQuality: env.DEFAULT_QUALITY || 'flac-preferred'
   };
 }

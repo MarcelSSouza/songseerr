@@ -1,0 +1,61 @@
+manifestVersion: 2.0
+id: marcel-songseerr
+storage:
+  dataRoot: data
+folderAccess:
+  - id: music-library
+    name: Music Library
+    note: Select the folder where verified songs and albums should be imported.
+    mounts:
+      - service: server
+        targetPath: /music
+environment:
+  - name: PROWLARR_URL
+    services: [server]
+    default: "http://prowlarr_server_1:9696"
+    note: URL of the Prowlarr instance.
+  - name: PROWLARR_API_KEY
+    services: [server]
+    note: API key from Prowlarr Settings > General.
+  - name: SABNZBD_URL
+    services: [server]
+    default: "http://sabnzbd_web_1:8080"
+    note: URL of the SABnzbd instance.
+  - name: SABNZBD_API_KEY
+    services: [server]
+    note: API key from SABnzbd Config > General.
+  - name: SABNZBD_CATEGORY
+    services: [server]
+    default: "music"
+    note: SABnzbd category used for music downloads.
+  - name: SABNZBD_COMPLETE_DIR
+    services: [server]
+    default: "/downloads/complete"
+    note: Completed-download directory reported by SABnzbd.
+  - name: DEFAULT_QUALITY
+    services: [server]
+    default: "flac-preferred"
+    options: [flac-only, flac-preferred, mp3-preferred, mp3-only]
+category: media
+name: SongSeerr
+version: "0.2.0"
+tagline: Request individual songs and albums
+description: >-
+  SongSeerr searches MusicBrainz and Prowlarr, ranks music releases by audio
+  quality, securely submits selected NZBs to SABnzbd, monitors downloads, and
+  imports verified FLAC or MP3 files into your music library.
+releaseNotes: ""
+developer: MarcelSSouza
+website: https://github.com/MarcelSSouza/songseerr
+dependencies:
+  - prowlarr
+  - sabnzbd
+repo: https://github.com/MarcelSSouza/songseerr
+support: https://github.com/MarcelSSouza/songseerr/issues
+port: 8795
+gallery: []
+path: ""
+permissions:
+  - STORAGE_DOWNLOADS
+submitter: MarcelSSouza
+submission: https://github.com/MarcelSSouza/songseerr

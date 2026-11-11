@@ -1,0 +1,29 @@
+services:
+  app_proxy:
+    environment:
+      APP_HOST: marcel-songseerr_server_1
+      APP_PORT: 8788
+
+  server:
+    image: ghcr.io/marcelssouza/songseerr:0.2.0
+    user: "1000:1000"
+    init: true
+    restart: on-failure
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "8788"
+      DATA_DIR: "/app/data"
+      MUSICBRAINZ_USER_AGENT: "SongSeerr/0.2.0 (self-hosted on umbrelOS)"
+      PROWLARR_URL: "http://prowlarr_server_1:9696"
+      PROWLARR_API_KEY: ""
+      SABNZBD_URL: "http://sabnzbd_web_1:8080"
+      SABNZBD_API_KEY: ""
+      SABNZBD_CATEGORY: "music"
+      SABNZBD_COMPLETE_DIR: "/downloads/complete"
+      DOWNLOAD_DIR: "/downloads/complete"
+      MUSIC_LIBRARY_DIR: "/music"
+      MONITOR_INTERVAL_MS: "30000"
+      DEFAULT_QUALITY: "flac-preferred"
+    volumes:
+      - ${APP_DATA_DIR}/data:/app/data
+      - ${UMBREL_ROOT}/data/storage/downloads:/downloads:ro

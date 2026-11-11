@@ -1,6 +1,7 @@
 FROM node:26-alpine
 WORKDIR /app
 COPY package.json ./
+RUN apk add --no-cache ffmpeg
 COPY src ./src
 COPY public ./public
 RUN mkdir -p /app/data && chown -R node:node /app

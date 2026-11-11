@@ -157,7 +157,8 @@ async function loadRequests() {
       title.textContent = `${request.artist ? `${request.artist} — ` : ''}${request.title}`;
       const meta = document.createElement('div');
       meta.className = 'release-meta';
-      meta.textContent = `${request.type} · ${request.quality} · ${new Date(request.createdAt).toLocaleString()}`;
+      const progress = request.status === 'downloading' ? ` · ${Math.round(request.download?.progress || 0)}%` : '';
+      meta.textContent = `${request.type} · ${request.quality}${progress} · ${new Date(request.createdAt).toLocaleString()}`;
       details.append(title, meta);
       const status = document.createElement('span');
       status.className = `request-status ${request.status}`;
@@ -180,8 +181,9 @@ function switchView(view) {
 async function init() {
   try {
     state.status = await api('/api/status');
-    const active = Object.entries(state.status.services).filter(([, value]) => value).map(([name]) => name);
-    $('#service-status').textContent = `${active.length}/3 services ready`;
+    const services = Object.entries(state.status.services);
+    const active = services.filter(([, value]) => value).map(([name]) => name);
+    $('#service-status').textContent = `${active.length}/${services.length} services ready`;
     $('#quality').value = state.status.defaultQuality;
   } catch {
     $('#service-status').textContent = 'Server unavailable';
