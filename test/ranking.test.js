@@ -17,6 +17,14 @@ test('FLAC preferred puts lossless above MP3', () => {
   assert.ok(ranked[0].score > ranked[1].score);
 });
 
+test('FLAC tier remains above MP3 regardless of seeder count', () => {
+  const ranked = rankReleases([
+    { title: 'Album MP3 320kbps', seeders: 10000 },
+    { title: 'Album FLAC', seeders: 0 }
+  ], 'flac-preferred');
+  assert.equal(ranked[0].detectedFormat, 'flac');
+});
+
 test('strict quality profiles reject the other codec', () => {
   assert.ok(scoreRelease({ title: 'Album MP3 320', seeders: 0 }, 'flac-only') < -900);
   assert.ok(scoreRelease({ title: 'Album FLAC', seeders: 0 }, 'mp3-only') < -900);

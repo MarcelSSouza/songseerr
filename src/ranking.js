@@ -24,6 +24,11 @@ export function scoreRelease(release, quality = 'flac-preferred') {
   return score;
 }
 
+function qualityTier(format, quality) {
+  if (quality.startsWith('flac')) return format === 'flac' ? 2 : format === 'mp3' ? 1 : 0;
+  return format === 'mp3' ? 2 : format === 'flac' ? 1 : 0;
+}
+
 export function rankReleases(releases, quality = 'flac-preferred') {
   return releases
     .map((release) => ({
@@ -32,5 +37,7 @@ export function rankReleases(releases, quality = 'flac-preferred') {
       score: scoreRelease(release, quality)
     }))
     .filter((release) => release.score > -900)
-    .sort((a, b) => b.score - a.score || Number(b.seeders || 0) - Number(a.seeders || 0));
+    .sort((a, b) => qualityTier(b.detectedFormat, quality) - qualityTier(a.detectedFormat, quality)
+      || b.score - a.score
+      || Number(b.seeders || 0) - Number(a.seeders || 0));
 }

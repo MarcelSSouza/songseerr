@@ -1,5 +1,3 @@
-import { fetchJson } from './http-client.js';
-
 export class SabnzbdClient {
   constructor(config) {
     this.url = config.url;
@@ -11,21 +9,30 @@ export class SabnzbdClient {
     if (!this.url || !this.apiKey) throw new Error('SABnzbd is not configured');
   }
 
-  async submitUrl(downloadUrl, name = '') {
+  async submitNzb(bytes, name = 'release') {
     this.assertConfigured();
-    const params = new URLSearchParams({
-      mode: 'addurl',
-      name: downloadUrl,
-      apikey: this.apiKey,
-      output: 'json',
-      cat: this.category
-    });
-    if (name) params.set('nzbname', name);
-    const response = await fetchJson(`${this.url}/api?${params}`, {}, 15000);
-    if (response?.status === false) throw new Error(response.error || 'SABnzbd rejected the release');
-    return {
-      accepted: Boolean(response?.status ?? true),
-      downloadId: response?.nzo_ids?.[0] || null
-    };
+    const safeName = String(name || 'release').replace(/[^\p{L}\p{N}._ -]+/gu, '').trim().slice(0, 150) || 'release';
+    const form = new FormData();
+    form.set('mode', 'addfile');
+    form.set('apikey', this.apiKey);
+    form.set('output', 'json');
+    form.set('cat', this.category);
+    form.set('nzbname', safeName);
+    form.set('name', new Blob([bytes], { type: 'application/x-nzb' }), `${safeName}.nzb`);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(`${this.url}/api`, { method: 'POST', body: form, signal: controller.signal });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(`SABnzbd returned HTTP ${response.status}`);
+      if (body?.status === false) throw new Error(body.error || 'SABnzbd rejected the release');
+      return {
+        accepted: Boolean(body?.status ?? true),
+        downloadId: body?.nzo_ids?.[0] || null
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 }

@@ -13,6 +13,30 @@ function coverArtUrl(releaseGroupId) {
 export class MusicBrainzClient {
   constructor(userAgent) {
     this.userAgent = userAgent;
+    this.cache = new Map();
+    this.nextRequestAt = 0;
+    this.queue = Promise.resolve();
+  }
+
+  async get(url) {
+    const cached = this.cache.get(url);
+    if (cached && Date.now() - cached.createdAt < 5 * 60 * 1000) return cached.body;
+    const run = async () => {
+      const waitMs = Math.max(0, this.nextRequestAt - Date.now());
+      if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+      try {
+        const body = await fetchJson(url, {
+          headers: { 'User-Agent': this.userAgent, Accept: 'application/json' }
+        });
+        this.cache.set(url, { body, createdAt: Date.now() });
+        return body;
+      } finally {
+        this.nextRequestAt = Date.now() + 1100;
+      }
+    };
+    const request = this.queue.then(run, run);
+    this.queue = request.catch(() => undefined);
+    return request;
   }
 
   async search(query, type = 'all', limit = 15) {
@@ -25,9 +49,7 @@ export class MusicBrainzClient {
 
   async searchSongs(query, limit = 15) {
     const params = new URLSearchParams({ query, fmt: 'json', limit: String(limit) });
-    const body = await fetchJson(`${BASE_URL}/recording?${params}`, {
-      headers: { 'User-Agent': this.userAgent, Accept: 'application/json' }
-    });
+    const body = await this.get(`${BASE_URL}/recording?${params}`);
     return (body.recordings || []).map((recording) => {
       const release = recording.releases?.[0];
       const releaseGroupId = release?.['release-group']?.id;
@@ -46,9 +68,7 @@ export class MusicBrainzClient {
 
   async searchAlbums(query, limit = 15) {
     const params = new URLSearchParams({ query, fmt: 'json', limit: String(limit) });
-    const body = await fetchJson(`${BASE_URL}/release-group?${params}`, {
-      headers: { 'User-Agent': this.userAgent, Accept: 'application/json' }
-    });
+    const body = await this.get(`${BASE_URL}/release-group?${params}`);
     return (body['release-groups'] || []).map((album) => ({
       type: 'album',
       metadataId: album.id,

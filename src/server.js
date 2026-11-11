@@ -97,9 +97,10 @@ async function handleApi(req, res, url) {
     validateRequest(input);
     let status = 'requested';
     let downloadId = null;
-    if (input.release?.downloadUrl) {
-      const downloadUrl = prowlarr.authenticatedDownloadUrl(input.release.downloadUrl);
-      const result = await sabnzbd.submitUrl(downloadUrl, `${input.artist || ''} - ${input.title}`.trim());
+    if (input.release?.candidateId) {
+      const candidate = await prowlarr.downloadNzb(input.release.candidateId);
+      const result = await sabnzbd.submitNzb(candidate.bytes, `${input.artist || ''} - ${input.title}`.trim());
+      input.release = candidate.release;
       status = 'downloading';
       downloadId = result.downloadId;
     }

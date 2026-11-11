@@ -61,7 +61,7 @@ Do not commit `.env`; it is ignored by Git.
 2. Song requests are mapped to their album when available, because indexers typically publish complete releases.
 3. Search Prowlarr's music category.
 4. Rank candidates according to the chosen quality profile.
-5. Send the chosen NZB URL to SABnzbd.
+5. Fetch the selected NZB inside the backend and upload its bytes to SABnzbd; indexer URLs and credentials never reach the browser.
 6. Persist request and SABnzbd queue identifiers under `DATA_DIR`.
 
 ## Development
