@@ -1,7 +1,6 @@
 {
   "name": "songseerr",
-  "version": "0.2.0",
-  "private": true,
+  "version": "0.2.2",
   "type": "module",
   "description": "Seerr-style song and album request manager for Prowlarr and SABnzbd",
   "scripts": {
