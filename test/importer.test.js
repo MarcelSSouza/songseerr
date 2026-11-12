@@ -68,6 +68,43 @@ test('song import extracts only the unambiguous requested track', { timeout: 300
   assert.deepEqual(files, ['01 - Wanted Song.flac']);
 });
 
+test('album import stages cover art from MusicBrainz when available', { timeout: 30000 }, async (t) => {
+  const { downloads, library, store } = await fixture(t);
+  const source = path.join(downloads, 'cover-job');
+  await mkdir(source);
+  await createFlac(path.join(source, '01.flac'), 'First Song');
+  const musicBrainz = { downloadCoverArt: async (id) => (id === 'rg-1' ? { bytes: new Uint8Array([1, 2, 3]), extension: 'jpg' } : null) };
+  const importer = new MusicImporter({
+    store, downloadDir: downloads, sabCompleteDir: downloads, libraryDir: library, dataDir: path.join(library, '..', 'data'), musicBrainz
+  });
+  const request = await store.create({
+    type: 'album', title: 'Cover Album', album: 'Cover Album', artist: 'Test Artist', metadataId: 'rg-1',
+    quality: 'flac-preferred', status: 'import_pending', import: { attempt: 0, source, files: [], error: null }
+  });
+  assert.equal(await importer.importNext(), true);
+  const files = await readdir(path.join(library, 'Test Artist', 'Cover Album'));
+  assert.ok(files.includes('cover.jpg'));
+});
+
+test('album import skips cover art gracefully when none is available', { timeout: 30000 }, async (t) => {
+  const { downloads, library, store } = await fixture(t);
+  const source = path.join(downloads, 'no-cover-job');
+  await mkdir(source);
+  await createFlac(path.join(source, '01.flac'), 'First Song');
+  const musicBrainz = { downloadCoverArt: async () => null };
+  const importer = new MusicImporter({
+    store, downloadDir: downloads, sabCompleteDir: downloads, libraryDir: library, dataDir: path.join(library, '..', 'data'), musicBrainz
+  });
+  const request = await store.create({
+    type: 'album', title: 'No Cover Album', album: 'No Cover Album', artist: 'Test Artist', metadataId: 'rg-unknown',
+    quality: 'flac-preferred', status: 'import_pending', import: { attempt: 0, source, files: [], error: null }
+  });
+  assert.equal(await importer.importNext(), true);
+  assert.equal(store.get(request.id).status, 'available');
+  const files = await readdir(path.join(library, 'Test Artist', 'No Cover Album'));
+  assert.ok(!files.some((name) => name.startsWith('cover.')));
+});
+
 test('source mapping rejects paths outside the download root', async (t) => {
   const { root, importer } = await fixture(t);
   const outside = path.join(root, 'outside');

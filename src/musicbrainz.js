@@ -6,9 +6,18 @@ function artistCredit(item) {
   return (item['artist-credit'] || []).map((credit) => credit.name).filter(Boolean).join(', ');
 }
 
-function coverArtUrl(releaseGroupId) {
-  return releaseGroupId ? `https://coverartarchive.org/release-group/${releaseGroupId}/front-250` : null;
+function coverArtUrl(releaseGroupId, size = '250') {
+  if (!releaseGroupId) return null;
+  const suffix = size === 'full' ? '' : `-${size}`;
+  return `https://coverartarchive.org/release-group/${releaseGroupId}/front${suffix}`;
 }
+
+const COVER_EXTENSION_BY_CONTENT_TYPE = {
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp'
+};
 
 export class MusicBrainzClient {
   constructor(userAgent) {
@@ -82,6 +91,36 @@ export class MusicBrainzClient {
       coverUrl: coverArtUrl(album.id)
     }));
     return albums.sort((a, b) => (a.year || '9999').localeCompare(b.year || '9999'));
+  }
+
+  // Fetches the full-size cover image for a release group directly from the
+  // Cover Art Archive. Not every release has archived art, and this is a
+  // different host than the rate-limited MusicBrainz API, so failures
+  // (404, network error, timeout) resolve to null instead of throwing --
+  // callers should treat a missing cover as a non-fatal, expected outcome.
+  async downloadCoverArt(releaseGroupId) {
+    const url = coverArtUrl(releaseGroupId, 'full');
+    if (!url) return null;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(url, {
+        headers: { 'User-Agent': this.userAgent, Accept: 'image/jpeg, image/png, image/webp' },
+        signal: controller.signal,
+        redirect: 'follow'
+      });
+      if (!response.ok) return null;
+      const contentType = (response.headers.get('content-type') || '').split(';')[0].trim();
+      const extension = COVER_EXTENSION_BY_CONTENT_TYPE[contentType];
+      if (!extension) return null;
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (!bytes.length) return null;
+      return { bytes, extension, contentType };
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   async searchSongs(query, limit = 15) {

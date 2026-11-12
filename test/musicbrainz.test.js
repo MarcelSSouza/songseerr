@@ -51,6 +51,41 @@ test('search() with type=artist delegates to searchArtists', async (t) => {
   assert.equal(results[0].type, 'artist');
 });
 
+test('downloadCoverArt returns bytes and extension for a known content type', async (t) => {
+  const mock = await mockServer((req, res) => {
+    assert.equal(req.url, '/release-group/rg-1/front');
+    res.writeHead(200, { 'Content-Type': 'image/jpeg' });
+    res.end(Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
+  });
+  t.after(() => mock.server.close());
+  const client = new MusicBrainzClient('test-agent');
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (url, options) => originalFetch(String(url).replace('https://coverartarchive.org', mock.url), options);
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const cover = await client.downloadCoverArt('rg-1');
+  assert.equal(cover.extension, 'jpg');
+  assert.equal(cover.bytes.length, 4);
+});
+
+test('downloadCoverArt resolves to null when the archive has no art', async (t) => {
+  const mock = await mockServer((req, res) => {
+    res.writeHead(404);
+    res.end();
+  });
+  t.after(() => mock.server.close());
+  const client = new MusicBrainzClient('test-agent');
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (url, options) => originalFetch(String(url).replace('https://coverartarchive.org', mock.url), options);
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const cover = await client.downloadCoverArt('rg-missing');
+  assert.equal(cover, null);
+});
+
+test('downloadCoverArt resolves to null for a missing release group id', async () => {
+  const client = new MusicBrainzClient('test-agent');
+  assert.equal(await client.downloadCoverArt(''), null);
+});
+
 test('getArtistAlbums returns albums sorted by year', async (t) => {
   const mock = await mockServer((req, res) => {
     assert.match(req.url, /^\/release-group\?/);

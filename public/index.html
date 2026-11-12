@@ -5,12 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b1020">
   <title>SongSeerr</title>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png">
+  <link rel="apple-touch-icon" href="/icons/icon-180.png">
+  <link rel="manifest" href="/site.webmanifest">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="/" aria-label="SongSeerr home"><span>♪</span> SongSeerr</a>
     <nav><button class="nav-button active" data-view="discover">Discover</button><button class="nav-button" data-view="requests">Requests</button><button class="nav-button" data-view="library">Library</button></nav>
+    <button id="show-welcome" type="button" class="icon-button" aria-label="How SongSeerr works" title="How SongSeerr works">?</button>
     <span id="service-status" class="status-pill">Checking services…</span>
   </header>
 
@@ -55,6 +61,23 @@
     <audio id="player-audio" controls></audio>
     <div id="player-queue" class="player-queue"></div>
   </footer>
+
+  <dialog id="welcome-dialog">
+    <form method="dialog" class="dialog-shell welcome-shell">
+      <div class="dialog-header"><div><p class="eyebrow">WELCOME</p><h2>How SongSeerr works</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div>
+      <ol class="welcome-steps">
+        <li><strong>1. Search</strong> for a song, album, or artist — powered by MusicBrainz, with cover art and a browsable artist discography.</li>
+        <li><strong>2. Pick a release</strong> and a quality profile (FLAC or MP3). SongSeerr finds matching releases through Prowlarr and ranks them for you.</li>
+        <li><strong>3. Request it.</strong> The chosen release is sent straight to SABnzbd to download automatically — no manual file hunting.</li>
+        <li><strong>4. Track progress</strong> in the <em>Requests</em> tab, from queued through downloading, importing, and finally available.</li>
+        <li><strong>5. Listen</strong> from the <em>Library</em> tab once it's imported — covers, album grouping, and a built-in player, all in one place.</li>
+      </ol>
+      <div class="welcome-footer">
+        <label class="welcome-dontshow"><input type="checkbox" id="welcome-dontshow" checked> Don't show this again</label>
+        <button class="request-button" value="default">Got it</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog id="release-dialog">
     <form method="dialog" class="dialog-shell">

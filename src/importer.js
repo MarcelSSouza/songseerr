@@ -39,7 +39,7 @@ function attention(message) {
 }
 
 export class MusicImporter {
-  constructor({ store, downloadDir, sabCompleteDir, libraryDir, dataDir, ffprobePath = 'ffprobe', ffmpegPath = 'ffmpeg' }) {
+  constructor({ store, downloadDir, sabCompleteDir, libraryDir, dataDir, ffprobePath = 'ffprobe', ffmpegPath = 'ffmpeg', musicBrainz = null }) {
     this.store = store;
     this.downloadDir = downloadDir;
     this.sabCompleteDir = sabCompleteDir;
@@ -47,6 +47,7 @@ export class MusicImporter {
     this.dataDir = dataDir;
     this.ffprobePath = ffprobePath;
     this.ffmpegPath = ffmpegPath;
+    this.musicBrainz = musicBrainz;
     this.running = false;
   }
 
@@ -135,6 +136,13 @@ export class MusicImporter {
     return matches;
   }
 
+  async stageCoverArt(stage, request) {
+    if (!this.musicBrainz || request.type !== 'album' || !request.metadataId) return;
+    const cover = await this.musicBrainz.downloadCoverArt(request.metadataId).catch(() => null);
+    if (!cover) return;
+    await writeFile(path.join(stage, `cover.${cover.extension}`), cover.bytes, { flag: 'wx', mode: 0o644 }).catch(() => {});
+  }
+
   async importRequest(request) {
     const source = await this.mapSource(request.import?.source);
     const files = await this.discoverAudio(source);
@@ -191,6 +199,7 @@ export class MusicImporter {
         } catch (error) {
           if (error.code !== 'ENOENT') throw error;
         }
+        await this.stageCoverArt(stage, request);
         await writeFile(path.join(stage, '.songseerr.json'), `${JSON.stringify(manifest, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
         await rename(stage, destinationDir);
         return outputs.map(({ filename }) => path.join(destinationDir, filename));

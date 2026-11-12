@@ -285,6 +285,20 @@ async function loadLibrary(force = false) {
   }
 }
 
+function initWelcomeDialog() {
+  const dialog = $('#welcome-dialog');
+  const dontShow = $('#welcome-dontshow');
+  const STORAGE_KEY = 'songseerr:welcome-dismissed';
+  if (!localStorage.getItem(STORAGE_KEY)) dialog.showModal();
+  $('#show-welcome').addEventListener('click', () => {
+    dontShow.checked = false;
+    dialog.showModal();
+  });
+  dialog.addEventListener('close', () => {
+    if (dontShow.checked) localStorage.setItem(STORAGE_KEY, '1');
+  });
+}
+
 async function init() {
   try {
     state.status = await api('/api/status');
@@ -302,6 +316,7 @@ async function init() {
   $('#refresh-library').addEventListener('click', () => loadLibrary(true));
   $('#player-audio').addEventListener('ended', playNextInQueue);
   $$('.nav-button').forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view)));
+  initWelcomeDialog();
 }
 
 init();
