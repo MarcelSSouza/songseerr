@@ -23,13 +23,13 @@
         <form id="search-form" class="search-bar">
           <label class="sr-only" for="search-input">Song, album, or artist</label>
           <input id="search-input" autocomplete="off" placeholder="Search for a song, album, or artist…" required minlength="2">
-          <select id="search-type" aria-label="Search type"><option value="all">Everything</option><option value="song">Songs</option><option value="album">Albums</option></select>
+          <select id="search-type" aria-label="Search type"><option value="all">Everything</option><option value="song">Songs</option><option value="album">Albums</option><option value="artist">Artists</option></select>
           <button type="submit">Search</button>
         </form>
       </div>
 
       <section class="content-section">
-        <div class="section-heading"><div><p class="eyebrow">CATALOGUE</p><h2 id="results-title">Start with a search</h2></div><span id="result-count"></span></div>
+        <div class="section-heading"><div><p class="eyebrow">CATALOGUE</p><h2 id="results-title">Start with a search</h2><button id="back-to-results" type="button" class="secondary hidden">← Back to search results</button></div><span id="result-count"></span></div>
         <div id="message" class="message hidden" role="status"></div>
         <div id="results" class="cards empty-state"><p>Song and album results will appear here.</p></div>
       </section>

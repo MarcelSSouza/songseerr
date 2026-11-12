@@ -1,4 +1,4 @@
-const state = { selected: null, releases: [], status: null };
+const state = { selected: null, releases: [], status: null, lastResults: null };
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 
@@ -32,13 +32,13 @@ function renderResults(results) {
   container.replaceChildren();
   $('#result-count').textContent = `${results.length} result${results.length === 1 ? '' : 's'}`;
   if (!results.length) {
-    container.innerHTML = '<p>No matching songs or albums were found.</p>';
+    container.innerHTML = '<p>No matching songs, albums, or artists were found.</p>';
     return;
   }
   for (const result of results) {
     const card = $('#result-template').content.cloneNode(true);
     card.querySelector('h3').textContent = result.title;
-    card.querySelector('.artist').textContent = result.artist || 'Unknown artist';
+    card.querySelector('.artist').textContent = result.type === 'artist' ? (result.disambiguation || '') : (result.artist || 'Unknown artist');
     card.querySelector('.metadata').textContent = [result.album !== result.title ? result.album : '', result.year, result.primaryType].filter(Boolean).join(' · ');
     card.querySelector('.type-badge').textContent = result.type;
     const image = card.querySelector('img');
@@ -46,9 +46,38 @@ function renderResults(results) {
       image.src = result.coverUrl;
       image.addEventListener('error', () => image.remove());
     } else image.remove();
-    card.querySelector('.request-button').addEventListener('click', () => openReleases(result));
+    const button = card.querySelector('.request-button');
+    if (result.type === 'artist') {
+      button.textContent = 'View albums';
+      button.addEventListener('click', () => viewArtistAlbums(result));
+    } else {
+      button.addEventListener('click', () => openReleases(result));
+    }
     container.append(card);
   }
+}
+
+async function viewArtistAlbums(artist) {
+  state.lastResults = { title: $('#results-title').textContent, results: state.currentResults || [] };
+  showMessage('#message', `Loading albums by ${artist.artist}…`);
+  try {
+    const body = await api(`/api/artist/${encodeURIComponent(artist.metadataId)}/albums`);
+    showMessage('#message');
+    state.currentResults = body.results;
+    $('#results-title').textContent = `Albums by ${artist.artist}`;
+    $('#back-to-results').classList.remove('hidden');
+    renderResults(body.results);
+  } catch (error) {
+    showMessage('#message', error.message, true);
+  }
+}
+
+function backToSearchResults() {
+  if (!state.lastResults) return;
+  $('#results-title').textContent = state.lastResults.title;
+  $('#back-to-results').classList.add('hidden');
+  state.currentResults = state.lastResults.results;
+  renderResults(state.lastResults.results);
 }
 
 async function search(event) {
@@ -57,9 +86,11 @@ async function search(event) {
   const type = $('#search-type').value;
   showMessage('#message', 'Searching MusicBrainz…');
   $('#results-title').textContent = `Results for “${query}”`;
+  $('#back-to-results').classList.add('hidden');
   try {
     const body = await api(`/api/search?q=${encodeURIComponent(query)}&type=${type}`);
     showMessage('#message');
+    state.currentResults = body.results;
     renderResults(body.results);
   } catch (error) {
     showMessage('#message', error.message, true);
@@ -265,6 +296,7 @@ async function init() {
     $('#service-status').textContent = 'Server unavailable';
   }
   $('#search-form').addEventListener('submit', search);
+  $('#back-to-results').addEventListener('click', backToSearchResults);
   $('#rerun-release-search').addEventListener('click', findReleases);
   $('#refresh-requests').addEventListener('click', loadRequests);
   $('#refresh-library').addEventListener('click', () => loadLibrary(true));

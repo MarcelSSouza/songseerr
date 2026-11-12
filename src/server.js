@@ -142,8 +142,12 @@ async function handleApi(req, res, url) {
     const query = String(url.searchParams.get('q') || '').trim();
     const type = url.searchParams.get('type') || 'all';
     if (query.length < 2) return sendJson(res, 400, { error: 'Search requires at least two characters' });
-    if (!['all', 'song', 'album'].includes(type)) return sendJson(res, 400, { error: 'Invalid search type' });
+    if (!['all', 'song', 'album', 'artist'].includes(type)) return sendJson(res, 400, { error: 'Invalid search type' });
     return sendJson(res, 200, { results: await musicBrainz.search(query, type) });
+  }
+  const artistAlbumsMatch = url.pathname.match(/^\/api\/artist\/([0-9a-f-]+)\/albums$/i);
+  if (req.method === 'GET' && artistAlbumsMatch) {
+    return sendJson(res, 200, { results: await musicBrainz.getArtistAlbums(artistAlbumsMatch[1]) });
   }
   if (req.method === 'GET' && url.pathname === '/api/releases') {
     const query = String(url.searchParams.get('q') || '').trim();

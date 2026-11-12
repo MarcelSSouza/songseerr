@@ -40,11 +40,48 @@ export class MusicBrainzClient {
   }
 
   async search(query, type = 'all', limit = 15) {
+    if (type === 'artist') return this.searchArtists(query, limit);
     const searches = [];
     if (type === 'all' || type === 'song') searches.push(this.searchSongs(query, limit));
     if (type === 'all' || type === 'album') searches.push(this.searchAlbums(query, limit));
     const groups = await Promise.all(searches);
     return groups.flat().slice(0, limit * (type === 'all' ? 2 : 1));
+  }
+
+  async searchArtists(query, limit = 15) {
+    const params = new URLSearchParams({ query, fmt: 'json', limit: String(limit) });
+    const body = await this.get(`${BASE_URL}/artist?${params}`);
+    return (body.artists || []).map((artist) => ({
+      type: 'artist',
+      metadataId: artist.id,
+      title: artist.name,
+      artist: artist.name,
+      album: '',
+      year: artist['life-span']?.begin?.slice(0, 4) || '',
+      disambiguation: artist.disambiguation || '',
+      coverUrl: null
+    }));
+  }
+
+  async getArtistAlbums(artistId, limit = 100) {
+    const params = new URLSearchParams({
+      artist: artistId,
+      fmt: 'json',
+      limit: String(limit),
+      type: 'album|ep'
+    });
+    const body = await this.get(`${BASE_URL}/release-group?${params}`);
+    const albums = (body['release-groups'] || []).map((album) => ({
+      type: 'album',
+      metadataId: album.id,
+      title: album.title,
+      artist: artistCredit(album),
+      album: album.title,
+      year: album['first-release-date']?.slice(0, 4) || '',
+      primaryType: album['primary-type'] || '',
+      coverUrl: coverArtUrl(album.id)
+    }));
+    return albums.sort((a, b) => (a.year || '9999').localeCompare(b.year || '9999'));
   }
 
   async searchSongs(query, limit = 15) {
